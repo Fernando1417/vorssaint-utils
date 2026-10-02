@@ -159,6 +159,7 @@ struct NotchPagePreview: View {
             NotchNotificationsView(size: size).notchBand(trailing: { NotchClearNotificationsButton() })
         case .downloads: NotchDownloadsView(size: size)
         case .calendar: NotchCalendarView(size: size)
+        case .kiwiDesk: NotchKiwiDeskView(size: size)
         case .controls: NotchControlsView(service: notch, size: size)
         case .mixer: NotchMixerView(size: size)
         case .music: NotchMusicView(size: size, extrasHeight: notch.geometry.musicExtrasHeight)
@@ -399,6 +400,7 @@ extension NotchModule {
         case .system: return .green
         case .tools: return .gray
         case .calendar: return .red
+        case .kiwiDesk: return Color(red: 0.42, green: 0.7, blue: 0.25)
         case .notifications: return .orange
         case .timer: return .mint
         case .camera: return .teal
