@@ -1042,6 +1042,7 @@ extension AppFeature {
         case .notchDownloads: return FeatureStrings.notchFiles(L10n.shared.language).downloadsTitle
         case .notchCalendar: return FeatureStrings.notchCalendar(L10n.shared.language).title
         case .notchKiwiDesk: return FeatureStrings.notchKiwiDesk(L10n.shared.language).title
+        case .dockProfiles: return FeatureStrings.dockProfiles(L10n.shared.language).title
         case .notchAgents: return FeatureStrings.notchAgents(L10n.shared.language).title
         case .notchWatch: return FeatureStrings.notchWatch(L10n.shared.language).title
         case .notch: return FeatureStrings.notch(L10n.shared.language).title
@@ -1125,6 +1126,7 @@ extension AppFeature {
         case .notchDownloads: return FeatureStrings.notchFiles(L10n.shared.language).downloadsDescription
         case .notchCalendar: return FeatureStrings.notchCalendar(L10n.shared.language).description
         case .notchKiwiDesk: return FeatureStrings.notchKiwiDesk(L10n.shared.language).description
+        case .dockProfiles: return FeatureStrings.dockProfiles(L10n.shared.language).description
         case .notchAgents: return FeatureStrings.notchAgents(L10n.shared.language).hubDescription
         case .notchWatch: return FeatureStrings.notchWatch(L10n.shared.language).description
         case .notch: return FeatureStrings.notch(L10n.shared.language).description

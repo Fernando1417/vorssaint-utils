@@ -271,6 +271,8 @@ if (( TEST )); then
         Sources/Vorssaint/Services/Notch/NotchWatchSupport.swift
         Sources/Vorssaint/Core/NotchKiwiDeskStrings.swift
         Sources/Vorssaint/Services/Notch/KiwiDeskSupport.swift
+        Sources/Vorssaint/Core/DockProfileStrings.swift
+        Sources/Vorssaint/Services/DockProfiles/DockProfileSupport.swift
         Sources/Vorssaint/Services/Notch/NotchFileToolsSupport.swift
         Sources/Vorssaint/Services/Notch/NotchDownloadSupport.swift
         Sources/Vorssaint/Services/Notch/NotchDownloadProgressObserver.swift

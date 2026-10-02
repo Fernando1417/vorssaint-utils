@@ -46,6 +46,42 @@ frontmost app changes, and a 15-second safety read.
 
 Logs go to the unified log under the category `KiwiDesk`.
 
+### Dock profiles
+
+Ported from the Dock profiles feature of Notch Sidekick. Save named sets of
+Dock app icons and switch the Dock between them.
+
+- **Settings → Dock → Dock Profiles** makes and edits profiles: start one from
+  the current Dock or empty, add apps with the app picker, drag icons (or use
+  their menu) to put them in order, rename, delete, and Apply.
+- **The Dock Profiles page in the Dynamic Island** applies a profile with one
+  click and marks the one the Dock shows now. Option-Command-L opens it.
+- **Undo Last Change** puts back the Dock as it was before the last apply,
+  with its original tiles, until Vorssaint quits.
+
+**Turning it on.** Settings → Features → Windows and Dock → Dock Profiles. It
+ships uninstalled and needs no permission.
+
+**How it changes the Dock.** It writes only the `persistent-apps` key of the
+`com.apple.dock` preferences, the format `defaults write` and dockutil use,
+reads it back to check it, then runs `/usr/bin/killall Dock` so the Dock
+reloads (it disappears for a moment). Finder, folders, files, recent apps and
+Dock settings such as size and position are left alone. A profile with an app
+that is no longer installed, or listed twice, is refused with the names. The
+profiles are saved as JSON under `dockProfiles` and travel with settings
+backups.
+
+**Code.**
+
+| File | Role |
+| --- | --- |
+| `Sources/Vorssaint/Services/DockProfiles/DockProfileSupport.swift` | Pure logic: the profile model, saving, checking, the Dock's tile format, reordering. Tested. |
+| `Sources/Vorssaint/Services/DockProfiles/DockProfileService.swift` | Saved profiles, applying, undo. |
+| `Sources/Vorssaint/UI/Settings/DockProfilesSettings.swift` | The editor card on the Dock settings page. |
+| `Sources/Vorssaint/UI/Notch/NotchDockProfilesView.swift` | The island page. |
+| `Sources/Vorssaint/Core/DockProfileStrings.swift` | Text in every app language. |
+| `Tests/DockProfileTests.swift` | Contracts for the support code and the feature gate. |
+
 ## Pulling upstream updates
 
 ```sh
@@ -60,8 +96,11 @@ only the one-line registrations each new feature needs, so a merge conflicts
 only when upstream edits the same line. That most often happens when upstream
 adds another Dynamic Island page or feature, in these places:
 
-- `AppFeature`'s case list and `FeatureVisibilitySupport`'s list of island features,
+- `AppFeature`'s case list and `FeatureVisibilitySupport`'s lists of island and Dock features,
 - `NotchModule`'s case list,
+- the Dock settings page (`UI/Settings/DockSettings.swift`), where the Dock Profiles card is inserted,
+- `SettingsBackupSupport.unregisteredPreferenceKeys`, which lists `dockProfiles`,
 - `Tests/FeatureCatalogTests.swift` (feature count and the stable id list).
 
-In each case, keep both sides: upstream's new entry and `notchKiwiDesk` / `kiwiDesk`.
+In each case, keep both sides: upstream's new entry and the fork's
+(`notchKiwiDesk` / `kiwiDesk`, `dockProfiles`).

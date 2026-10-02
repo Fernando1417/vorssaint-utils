@@ -966,6 +966,7 @@ enum NotchTests {
         NotchActivityTests.run(suite)
         NotchWatchTests.run(suite)
         NotchKiwiDeskTests.run(suite)
+        DockProfileTests.run(suite)
         NotchMusicExtrasTests.run(suite)
         NotchLockScreenTests.run(suite)
         NowPlayingOpenContract.run(suite)

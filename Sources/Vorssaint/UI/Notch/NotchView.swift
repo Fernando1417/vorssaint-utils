@@ -535,6 +535,7 @@ struct NotchView: View {
             case .downloads: NotchDownloadsView(size: pageSize)
             case .calendar: NotchCalendarView(size: pageSize)
             case .kiwiDesk: NotchKiwiDeskView(size: pageSize)
+            case .dockProfiles: NotchDockProfilesView(size: pageSize)
             case .controls: NotchControlsView(service: service, size: pageSize)
             case .mixer: NotchMixerView(size: pageSize)
             case .music: NotchMusicView(size: pageSize, extrasHeight: service.geometry.musicExtrasHeight)
@@ -707,6 +708,7 @@ extension NotchModule: PanelOrderItem {
         case .downloads: return FeatureStrings.notchFiles(language).downloadsTitle
         case .calendar: return FeatureStrings.notchCalendar(language).title
         case .kiwiDesk: return FeatureStrings.notchKiwiDesk(language).title
+        case .dockProfiles: return FeatureStrings.dockProfiles(language).title
         case .controls: return FeatureStrings.notch(language).controls
         case .mixer: return Strings.localized(language).mixerSection
         case .music: return FeatureStrings.radialMenu(language).mediaNowPlaying
