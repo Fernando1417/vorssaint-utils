@@ -1738,6 +1738,7 @@ enum NotchTests {
         NotchMascotTests.run(suite)
         NotchMascotHidingContract.run(suite)
         NotchKiwiDeskTests.run(suite)
+        DockProfileTests.run(suite)
         NotchMusicExtrasTests.run(suite)
         NotchLockScreenTests.run(suite)
         NowPlayingOpenContract.run(suite)

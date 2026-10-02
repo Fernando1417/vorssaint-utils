@@ -52,6 +52,10 @@ struct DockSettings: View {
                     spacesOrderCard
                         .settingsSectionAnchor(.spacesOrder, cornerRadius: 16)
                 }
+                // Fork addition: saved sets of Dock apps.
+                if AppFeature.dockProfiles.isAvailable {
+                    DockProfilesSettingsCard()
+                }
                 if AppFeature.dockPreview.isAvailable {
                     WindowPreviewsCard(sizeKey: DefaultsKey.previewSize,
                                        excludedAppsKey: DefaultsKey.windowPreviewExcludedApps)
