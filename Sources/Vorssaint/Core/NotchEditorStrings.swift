@@ -57,6 +57,7 @@ struct NotchEditorStrings {
     let capturesSummary: String
     let filesSummary: String
     let systemSummary: String
+    let kiwiDeskSummary: String
     let toolsSummary: String
     let calendarSummary: String
     let notificationsSummary: String
@@ -83,6 +84,7 @@ struct NotchEditorStrings {
         case .system: return systemSummary
         case .tools: return toolsSummary
         case .calendar: return calendarSummary
+        case .kiwiDesk: return kiwiDeskSummary
         case .notifications: return notificationsSummary
         case .timer: return timerSummary
         case .camera: return cameraSummary
@@ -151,6 +153,7 @@ extension FeatureStrings {
             capturesSummary: "Your latest screenshots and recordings.",
             filesSummary: "A shelf for the files you drop on the island.",
             systemSummary: "CPU, memory, disk, network and battery at a glance.",
+            kiwiDeskSummary: "The spaces of the KiwiDesk tiling window manager and the apps on each.",
             toolsSummary: "Tools and utilities, one click away.",
             calendarSummary: "Today’s events and the month ahead.",
             notificationsSummary: "Your Mac’s notifications, kept in the island.",
@@ -215,6 +218,7 @@ extension FeatureStrings {
             capturesSummary: "Suas capturas de tela e gravações mais recentes.",
             filesSummary: "Uma prateleira para os arquivos que você solta na ilha.",
             systemSummary: "CPU, memória, disco, rede e bateria num relance.",
+            kiwiDeskSummary: "As mesas do gerenciador de janelas KiwiDesk e os apps de cada uma.",
             toolsSummary: "Ferramentas e utilitários a um clique.",
             calendarSummary: "Os eventos de hoje e o mês inteiro.",
             notificationsSummary: "As notificações do Mac, guardadas na ilha.",
@@ -279,6 +283,7 @@ extension FeatureStrings {
             capturesSummary: "Tus capturas y grabaciones más recientes.",
             filesSummary: "Un estante para los archivos que sueltas en la isla.",
             systemSummary: "CPU, memoria, disco, red y batería de un vistazo.",
+            kiwiDeskSummary: "Los escritorios del gestor de ventanas KiwiDesk y las apps de cada uno.",
             toolsSummary: "Herramientas y utilidades a un clic.",
             calendarSummary: "Los eventos de hoy y el mes completo.",
             notificationsSummary: "Las notificaciones de tu Mac, reunidas en la isla.",
@@ -343,6 +348,7 @@ extension FeatureStrings {
             capturesSummary: "Vaše najnovšie snímky obrazovky a nahrávky.",
             filesSummary: "Polica na súbory, ktoré pustíte na Dynamic Island.",
             systemSummary: "CPU, pamäť, disk, sieť a batéria na jeden pohľad.",
+            kiwiDeskSummary: "Plochy správcu okien KiwiDesk a aplikácie na každej z nich.",
             toolsSummary: "Nástroje a pomôcky na jedno kliknutie.",
             calendarSummary: "Dnešné udalosti a nadchádzajúci mesiac.",
             notificationsSummary: "Hlásenia vášho Macu, zhromaždené v Dynamic Island.",
@@ -407,6 +413,7 @@ extension FeatureStrings {
             capturesSummary: "Deine neuesten Bildschirmfotos und Aufnahmen.",
             filesSummary: "Eine Ablage für Dateien, die du auf der Insel ablegst.",
             systemSummary: "CPU, Speicher, Festplatte, Netzwerk und Batterie auf einen Blick.",
+            kiwiDeskSummary: "Die Schreibtische des Fenstermanagers KiwiDesk und die Apps auf jedem.",
             toolsSummary: "Werkzeuge und Dienstprogramme, einen Klick entfernt.",
             calendarSummary: "Die Termine von heute und der ganze Monat.",
             notificationsSummary: "Die Mitteilungen deines Mac, gesammelt auf der Insel.",
@@ -471,6 +478,7 @@ extension FeatureStrings {
             capturesSummary: "Vos dernières captures d’écran et vidéos.",
             filesSummary: "Une étagère pour les fichiers déposés sur l’îlot.",
             systemSummary: "Processeur, mémoire, disque, réseau et batterie en un coup d’œil.",
+            kiwiDeskSummary: "Les bureaux du gestionnaire de fenêtres KiwiDesk et les apps de chacun.",
             toolsSummary: "Outils et utilitaires à portée de clic.",
             calendarSummary: "Les événements du jour et le mois entier.",
             notificationsSummary: "Les notifications de votre Mac, réunies dans l’îlot.",
@@ -535,6 +543,7 @@ extension FeatureStrings {
             capturesSummary: "Le tue ultime istantanee e registrazioni.",
             filesSummary: "Uno scaffale per i file che trascini sull’isola.",
             systemSummary: "CPU, memoria, disco, rete e batteria a colpo d’occhio.",
+            kiwiDeskSummary: "Le scrivanie del gestore di finestre KiwiDesk e le app su ognuna.",
             toolsSummary: "Strumenti e utility a portata di clic.",
             calendarSummary: "Gli eventi di oggi e il mese intero.",
             notificationsSummary: "Le notifiche del Mac, raccolte nell’isola.",
@@ -599,6 +608,7 @@ extension FeatureStrings {
             capturesSummary: "Ваши последние снимки экрана и записи.",
             filesSummary: "Полка для файлов, которые вы бросаете на остров.",
             systemSummary: "Процессор, память, диск, сеть и батарея одним взглядом.",
+            kiwiDeskSummary: "Рабочие столы оконного менеджера KiwiDesk и приложения на каждом.",
             toolsSummary: "Инструменты и утилиты в один клик.",
             calendarSummary: "События на сегодня и весь месяц.",
             notificationsSummary: "Уведомления Mac, собранные на острове.",
@@ -663,6 +673,7 @@ extension FeatureStrings {
             capturesSummary: "En son ekran görüntüleriniz ve kayıtlarınız.",
             filesSummary: "Adaya bıraktığınız dosyalar için bir raf.",
             systemSummary: "İşlemci, bellek, disk, ağ ve pil tek bakışta.",
+            kiwiDeskSummary: "KiwiDesk pencere yöneticisinin masaüstleri ve her birindeki uygulamalar.",
             toolsSummary: "Araçlar ve yardımcılar bir tık uzakta.",
             calendarSummary: "Bugünün etkinlikleri ve ayın tamamı.",
             notificationsSummary: "Mac’inizin bildirimleri, adada bir arada.",
@@ -727,6 +738,7 @@ extension FeatureStrings {
             capturesSummary: "最新のスクリーンショットと収録。",
             filesSummary: "島にドロップしたファイルを置いておく棚。",
             systemSummary: "CPU、メモリ、ディスク、ネットワーク、バッテリーをひと目で。",
+            kiwiDeskSummary: "ウインドウマネージャKiwiDeskのデスクトップと、それぞれのアプリ。",
             toolsSummary: "ツールとユーティリティをワンクリックで。",
             calendarSummary: "今日の予定と1か月の予定。",
             notificationsSummary: "Macの通知を島にまとめて表示。",
@@ -791,6 +803,7 @@ extension FeatureStrings {
             capturesSummary: "최근 스크린샷과 녹화.",
             filesSummary: "섬에 놓은 파일을 두는 선반.",
             systemSummary: "CPU, 메모리, 디스크, 네트워크, 배터리를 한눈에.",
+            kiwiDeskSummary: "윈도우 관리자 KiwiDesk의 데스크탑과 각 데스크탑의 앱.",
             toolsSummary: "도구와 유틸리티를 클릭 한 번으로.",
             calendarSummary: "오늘의 일정과 한 달 전체.",
             notificationsSummary: "Mac의 알림을 섬에 모아 보기.",
@@ -855,6 +868,7 @@ extension FeatureStrings {
             capturesSummary: "最近的截图和录屏。",
             filesSummary: "存放拖到岛上的文件的架子。",
             systemSummary: "CPU、内存、磁盘、网络和电池一目了然。",
+            kiwiDeskSummary: "窗口管理器 KiwiDesk 的桌面和每个桌面上的 App。",
             toolsSummary: "工具和实用程序，一键即达。",
             calendarSummary: "今天的日程和整个月。",
             notificationsSummary: "Mac 的通知，汇集在岛上。",
@@ -919,6 +933,7 @@ extension FeatureStrings {
             capturesSummary: "最近的截圖和錄影。",
             filesSummary: "存放拖到島上檔案的架子。",
             systemSummary: "CPU、記憶體、磁碟、網路和電池一目了然。",
+            kiwiDeskSummary: "視窗管理器 KiwiDesk 的桌面和每個桌面上的 App。",
             toolsSummary: "工具和工具程式，一按即達。",
             calendarSummary: "今天的行程和整個月份。",
             notificationsSummary: "Mac 的通知，集中在島上。",
@@ -983,6 +998,7 @@ extension FeatureStrings {
             capturesSummary: "最近的截圖和錄影。",
             filesSummary: "存放拖到島上檔案的架子。",
             systemSummary: "CPU、記憶體、磁碟、網路和電池一目了然。",
+            kiwiDeskSummary: "視窗管理器 KiwiDesk 的桌面和每個桌面上的 App。",
             toolsSummary: "工具和工具程式，一按即達。",
             calendarSummary: "今天的行程和整個月份。",
             notificationsSummary: "Mac 的通知，集中在島上。",
@@ -1047,6 +1063,7 @@ extension FeatureStrings {
             capturesSummary: "Останні знімки та записи екрана.",
             filesSummary: "Полиця для файлів, які ви перетягуєте на острівець.",
             systemSummary: "CPU, пам’ять, диски, мережа й акумулятор з першого погляду.",
+            kiwiDeskSummary: "Робочі столи менеджера вікон KiwiDesk і програми на кожному.",
             toolsSummary: "Інструменти й утиліти в один клік.",
             calendarSummary: "Сьогоднішні події та майбутній місяць.",
             notificationsSummary: "Сповіщення Mac, зібрані в острівці.",

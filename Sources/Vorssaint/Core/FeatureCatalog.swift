@@ -31,7 +31,9 @@ enum AppFeature: String, CaseIterable {
          commandBar, screenRecorder, wallpaper, killProcess, portManager
     // Dynamic Island, then its extensions
     case notch, notchCalendar, notchNotifications, notchGestures, notchTimer, notchAccessories, notchLyrics,
-         notchQueue, notchLiveEqualizer, notchDownloads, notchAgents, notchWatch
+         notchQueue, notchLiveEqualizer, notchDownloads, notchAgents, notchWatch,
+         // Fork addition: the KiwiDesk tiling window manager's spaces.
+         notchKiwiDesk
     // System monitor, one entry per metric family (temperatures live with
     // their parent metric: CPU temp with CPU, battery temp with power).
     case monitorCPU, monitorGPU, monitorMemory, monitorNetwork, monitorDisk, monitorPower, connectedDevices, fanControl
@@ -116,7 +118,8 @@ extension AppFeature {
              .scratchpad, .commandBar, .screenRecorder, .wallpaper, .killProcess, .portManager:
             return .tools
         case .notch, .notchCalendar, .notchNotifications, .notchGestures, .notchTimer, .notchAccessories,
-             .notchLyrics, .notchQueue, .notchLiveEqualizer, .notchDownloads, .notchAgents, .notchWatch:
+             .notchLyrics, .notchQueue, .notchLiveEqualizer, .notchDownloads, .notchAgents, .notchWatch,
+             .notchKiwiDesk:
             return .dynamicIsland
         case .monitorCPU, .monitorGPU, .monitorMemory, .monitorNetwork, .monitorDisk, .monitorPower,
              .connectedDevices, .fanControl:
@@ -188,6 +191,7 @@ extension AppFeature {
         case .notchDownloads: return "arrow.down.circle"
         case .notchNotifications: return "bell"
         case .notchCalendar: return "calendar"
+        case .notchKiwiDesk: return "rectangle.3.group"
         case .notchAgents: return "sparkles"
         case .notchWatch: return "eye"
         case .notch: return "macbook"
@@ -281,7 +285,7 @@ extension AppFeature {
         case .windowLayout, .diskImageInstaller, .mixer, .micMute, .keepAwake,
              .quickLauncher, .quickToggles, .colorPicker, .screenOCR, .cleaningMode, .mediaTools,
              .cleaner, .uninstaller, .homebrew, .appUpdates, .screenshot, .cameraPreview, .scratchpad,
-             .commandBar, .screenRecorder, .wallpaper, .killProcess, .portManager,
+             .commandBar, .screenRecorder, .wallpaper, .killProcess, .portManager, .notchKiwiDesk,
              .monitorCPU, .monitorGPU, .monitorMemory, .monitorNetwork, .monitorDisk, .monitorPower,
              .connectedDevices, .fanControl:
             return []
@@ -328,6 +332,8 @@ extension AppFeature {
         // Session logs and the saved limits sit in the home folder, outside
         // every protected location, and no sign-in or keychain item is used.
         case .notchAgents: return []
+        // The kiwidesk tool reaches KiwiDesk over a socket in the home folder.
+        case .notchKiwiDesk: return []
         // The bars read the player's own audio output, which macOS gates
         // behind the same permission the mixer and the recorder ask for.
         case .notchLiveEqualizer: return [.audioCapture]
@@ -469,7 +475,7 @@ extension AppFeature {
              .connectedDevices:
             return true
         case .focusFollowsMouse, .scrollHorizontal, .linearScroll, .diskImageInstaller, .audioPriority,
-             .wallpaper, .killProcess, .portManager, .fanControl:
+             .notchKiwiDesk, .wallpaper, .killProcess, .portManager, .fanControl:
             return false
         }
     }

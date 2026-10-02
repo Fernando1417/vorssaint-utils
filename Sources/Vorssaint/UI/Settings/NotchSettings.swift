@@ -428,6 +428,8 @@ struct NotchSettings: View {
             }
         case .scratchpad:
             destination(FeatureStrings.scratchpad(l10n.language).pageTitle, symbol: "note.text", value: $scratchpad)
+        case .kiwiDesk:
+            NotchKiwiDeskSettingsControls()
         case .agents:
             NotchAgentsSettingsControls()
         case .watch:
@@ -690,6 +692,7 @@ struct NotchSettings: View {
         case .files: return .shelf
         case .tools: return .quickLauncher
         case .calendar: return .notchCalendar
+        case .kiwiDesk: return .notchKiwiDesk
         case .notifications: return .notchNotifications
         case .timer: return .notchTimer
         case .camera: return .cameraPreview
