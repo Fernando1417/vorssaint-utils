@@ -428,6 +428,12 @@ struct NotchSettings: View {
             }
         case .scratchpad:
             destination(FeatureStrings.scratchpad(l10n.language).pageTitle, symbol: "note.text", value: $scratchpad)
+        case .kiwiDesk:
+            NotchKiwiDeskSettingsControls()
+        case .dockProfiles:
+            Text(FeatureStrings.dockProfiles(l10n.language).settingsHint)
+                .font(.callout).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         case .agents:
             NotchAgentsSettingsControls()
         case .watch:
@@ -690,6 +696,8 @@ struct NotchSettings: View {
         case .files: return .shelf
         case .tools: return .quickLauncher
         case .calendar: return .notchCalendar
+        case .kiwiDesk: return .notchKiwiDesk
+        case .dockProfiles: return .dockProfiles
         case .notifications: return .notchNotifications
         case .timer: return .notchTimer
         case .camera: return .cameraPreview

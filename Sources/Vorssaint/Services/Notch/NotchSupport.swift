@@ -8,6 +8,8 @@ import CoreGraphics
 
 enum NotchModule: String, CaseIterable, Identifiable {
     case controls, mixer, music, clipboard, captures, files, system, tools, calendar, notifications, timer, camera, downloads, scratchpad, agents, watch
+    // Fork addition: the KiwiDesk tiling window manager's spaces.
+    case kiwiDesk, dockProfiles
     var id: String { rawValue }
 
     var symbol: String {
@@ -22,6 +24,8 @@ enum NotchModule: String, CaseIterable, Identifiable {
         case .downloads: return "arrow.down.circle"
         case .notifications: return "bell"
         case .calendar: return "calendar"
+        case .kiwiDesk: return "rectangle.3.group"
+        case .dockProfiles: return "dock.arrow.up.rectangle"
         case .clipboard: return "doc.on.clipboard"
         case .captures: return "camera.viewfinder"
         case .files: return "tray.full"
@@ -45,6 +49,8 @@ enum NotchModule: String, CaseIterable, Identifiable {
         case .system: return "i"
         case .tools: return "t"
         case .calendar: return "a"
+        case .kiwiDesk: return "k"
+        case .dockProfiles: return "l"
         case .notifications: return "n"
         case .timer: return "r"
         case .camera: return "w"
@@ -63,6 +69,8 @@ enum NotchModule: String, CaseIterable, Identifiable {
         case .downloads: return AppFeature.notchDownloads.isAvailable(in: defaults)
         case .notifications: return AppFeature.notchNotifications.isAvailable(in: defaults)
         case .calendar: return AppFeature.notchCalendar.isAvailable(in: defaults)
+        case .kiwiDesk: return AppFeature.notchKiwiDesk.isAvailable(in: defaults)
+        case .dockProfiles: return AppFeature.dockProfiles.isAvailable(in: defaults)
         case .mixer: return AppFeature.mixer.isAvailable(in: defaults)
         case .tools: return AppFeature.quickLauncher.isAvailable(in: defaults)
         case .clipboard: return AppFeature.clipboardHistory.isAvailable(in: defaults)
@@ -2082,6 +2090,10 @@ struct NotchGeometry: Equatable {
                 guard let toolCount else { contentHeight = pageBudget; break }
                 contentHeight = min(budget, toolCount == 0 ? NotchLayout.emptyHeight
                     : NotchLayout.railHeight(rows: toolRows(count: toolCount), rowHeight: NotchLayout.toolHeight, spacing: NotchLayout.toolSpacing))
+            case .kiwiDesk:
+                contentHeight = min(budget, KiwiDeskSupport.pageHeight)
+            case .dockProfiles:
+                contentHeight = budget
             case .timer:
                 contentHeight = min(budget, NotchLayout.timer(mode: timerMode, hasSession: timerHasSession, width: contentWidth, height: budget))
             case .agents:

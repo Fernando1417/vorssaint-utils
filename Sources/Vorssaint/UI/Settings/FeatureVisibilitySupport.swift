@@ -340,6 +340,8 @@ extension AppFeature {
             return FeatureSettingsDestination(.quickTools, sectionAnchor: .cameraPreview)
         case .wallpaper:
             return FeatureSettingsDestination(.quickTools, sectionAnchor: .wallpaper)
+        case .notchKiwiDesk: return FeatureSettingsDestination(.notch)
+        case .dockProfiles: return FeatureSettingsDestination(.dock)
         case .notch, .notchCalendar, .notchNotifications, .notchGestures, .notchTimer, .notchAccessories, .notchLyrics, .notchQueue, .notchLiveEqualizer, .notchDownloads, .notchAgents, .notchWatch: return FeatureSettingsDestination(.notch)
         case .radialMenu: return FeatureSettingsDestination(.radialMenu)
         case .scratchpad:
@@ -373,7 +375,7 @@ enum FeatureVisibilitySupport {
         case .mouse: return [.scrollInverter, .scrollHorizontal, .focusFollowsMouse, .smoothScroll, .linearScroll, .mouseAcceleration, .mouseNavigation, .mouseButtonShortcuts,
                              .middleClick, .mouseClickDebounce]
         case .switcher: return [.switcher]
-        case .dock: return [.dockPreview, .dockClick]
+        case .dock: return [.dockPreview, .dockClick, .dockProfiles]
         case .windowLayout: return [.windowLayout, .windowMaximizer]
         case .autoQuit: return [.autoQuit]
         case .quitProtection: return [.quitWindowProtection]
@@ -394,7 +396,7 @@ enum FeatureVisibilitySupport {
         case .superKey: return [.superKey]
         case .textSnippets: return [.textSnippets]
         case .screenshot: return [.screenshot, .screenRecorder, .screenOCR, .colorPicker]
-        case .notch: return [.notch, .notchCalendar, .notchNotifications, .notchGestures, .notchTimer, .notchAccessories, .notchLyrics, .notchQueue, .notchLiveEqualizer, .notchDownloads, .notchAgents, .notchWatch]
+        case .notch: return [.notch, .notchCalendar, .notchNotifications, .notchGestures, .notchTimer, .notchAccessories, .notchLyrics, .notchQueue, .notchLiveEqualizer, .notchDownloads, .notchAgents, .notchWatch, .notchKiwiDesk]
         case .radialMenu: return [.radialMenu]
         case .commandBar: return [.commandBar]
         case .general, .features, .shortcuts, .advanced, .about, .releaseNotes, .support:

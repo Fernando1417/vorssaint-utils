@@ -114,6 +114,10 @@ extension AppFeature {
             return RadialMenuSupport.opensFromMouseOrTrackpad(
                 UserDefaults.standard.data(forKey: DefaultsKey.radialMenuProfiles))
                 ? .mouse : .idle
+        // Reads KiwiDesk only while its page is open.
+        case .notchKiwiDesk: return .idle
+        // Works only when a profile is applied.
+        case .dockProfiles: return .idle
         case .notchNotifications, .notchGestures, .notchTimer, .notchQueue, .notchDownloads: return .idle
         // It reads only while something is being watched, and stops on its own.
         case .notchWatch: return .idle

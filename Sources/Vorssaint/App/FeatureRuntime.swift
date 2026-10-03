@@ -373,6 +373,7 @@ final class FeatureRuntime: ObservableObject {
             if AppFeature.notch.isAvailable { NotchService.shared.syncWithPreferences() }
             else { NotchWatchService.shared.stop() }
         },
+        .notchKiwiDesk: { KiwiDeskService.shared.syncWithPreferences() },
         .scratchpad: { ScratchpadService.shared.syncWithPreferences() },
         .commandBar: { CommandBarService.shared.syncWithPreferences() },
         .cleaner: {
