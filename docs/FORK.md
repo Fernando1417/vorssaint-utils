@@ -24,7 +24,7 @@ After that the page can be shown, hidden and reordered in the Dynamic Island
 settings like any other page. Option-Command-K opens it while the island is open.
 
 **How it reads KiwiDesk.** Through the `kiwidesk` command line tool, found in
-`/opt/homebrew/bin`, `/usr/local/bin` or `/usr/bin`, or else on the login
+`/opt/homebrew/bin` or `/usr/local/bin`, or else on the login
 shell's `PATH` (asked once per launch). The tool reaches the KiwiDesk app over
 `~/.config/KiwiDesk/KiwiDesk.sock`. No macOS permission is needed. Vorssaint
 is not sandboxed, so the socket is reachable.

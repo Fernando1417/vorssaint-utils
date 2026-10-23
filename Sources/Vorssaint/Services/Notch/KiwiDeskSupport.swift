@@ -78,7 +78,7 @@ struct KiwiDeskState: Decodable, Equatable {
 enum KiwiDeskSupport {
     /// Homebrew on Apple silicon and on Intel, then the system's own folder.
     /// Other installs are found through the login shell's PATH.
-    static let cliCandidates = ["/opt/homebrew/bin/kiwidesk", "/usr/local/bin/kiwidesk", "/usr/bin/kiwidesk"]
+    static let cliCandidates = ["/opt/homebrew/bin/kiwidesk", "/usr/local/bin/kiwidesk"]
 
     /// Events after which the page reads the state again. Their content is
     /// not parsed: `get_state` stays the one source of truth.
