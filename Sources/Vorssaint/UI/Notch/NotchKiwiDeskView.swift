@@ -82,14 +82,18 @@ struct NotchKiwiDeskView: View {
             HStack(alignment: .top, spacing: 8) {
                 ForEach(kiwiDesk.spaces) { space in
                     NotchKiwiDeskSpaceCard(space: space, text: text)
-                        .transition(.scale(scale: 0.9).combined(with: .opacity))
+                        // Fade only: a scale pops the card in place while its
+                        // neighbours slide, which reads as a jump.
+                        .transition(.opacity)
                 }
             }
             .frame(maxHeight: .infinity, alignment: .top)
         }
         .scrollIndicators(.never)
         .notchScrollEdgeFade(.horizontal)
-        .animation(reduceMotion ? nil : .smooth(duration: 0.3), value: kiwiDesk.spaces)
+        // Only the set of spaces moves the row; focus and layout changes
+        // update their card in place without sliding its neighbours.
+        .animation(reduceMotion ? nil : .smooth(duration: 0.3), value: kiwiDesk.spaces.map(\.id))
     }
 }
 
@@ -182,6 +186,8 @@ private struct NotchKiwiDeskSpaceCard: View {
                     .frame(width: Self.icon, height: Self.icon)
             }
         }
+        // A short-lived window adds or removes an icon; the grid glides.
+        .animation(reduceMotion ? nil : .smooth(duration: 0.25), value: shown.map(\.id))
     }
 }
 
