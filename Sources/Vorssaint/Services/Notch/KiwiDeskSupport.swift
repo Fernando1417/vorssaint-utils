@@ -136,7 +136,9 @@ enum KiwiDeskSupport {
                                    name: window.bundleID.flatMap(name) ?? window.app,
                                    isFloating: window.floating, isActive: active)
             }
-            return apps.isEmpty ? nil : KiwiDeskSpace(id: space.id, mode: space.mode, apps: apps, isActive: isActive)
+            // The focused space stays even when empty: switching to it must not
+            // remove its card and slide the others.
+            return apps.isEmpty && !isActive ? nil : KiwiDeskSpace(id: space.id, mode: space.mode, apps: apps, isActive: isActive)
         }
     }
 
