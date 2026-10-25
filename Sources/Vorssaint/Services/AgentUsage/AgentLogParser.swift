@@ -5,14 +5,20 @@ import Darwin
 import Foundation
 
 /// What one log line says, reduced to the few facts the island keeps. Only
-/// usage counters, model names, times and folder names leave a line; prompts,
-/// replies and tool output are never decoded into anything that is stored.
+/// usage counters, model names, times and folder names leave a line, besides
+/// the identifiers of Claude's shell commands still running, held in memory
+/// only; prompts, replies and tool output are never decoded into anything
+/// that is stored.
 enum AgentLogEntry: Equatable {
     /// `key` identifies the response across duplicate lines and files.
     case usage(key: String, record: AgentUsageRecord, billable: AgentBillable)
+    /// A later chunk can identify the model of an already-counted request.
+    case usageModel(key: String, model: String)
     case limits(AgentLimits)
     case plan(String, observedAt: Date)
     case turnBegan(Date)
+    /// Model and folder context known before usage is reported.
+    case turnContext(model: String, project: String)
     /// Work continues; nil when the line was not worth decoding for its time.
     case turnActive(Date?)
     /// A step ended expecting the agent to go on; unless work follows soon,
@@ -34,10 +40,34 @@ struct AgentLogState: Equatable {
     var lastTotal: AgentTokens?
     /// Codex runs the thread on the fast tier, which bills at a premium.
     var fast = false
+    /// A Codex subagent, review or memory task owns no turn. Only the log's
+    /// metadata says so: a reverted thread goes on in a log named after both
+    /// the thread and a new rollout.
+    var codexSubagent = false
+    /// The first Codex metadata line describes the log's own thread; a later
+    /// one is history copied from the thread it came from.
+    var codexHeaderRead = false
+    /// The thread a person started that a Codex subagent works for, whose
+    /// turn its responses count toward.
+    var codexRoot = ""
+    /// The thread whose running totals the lines read now report: history
+    /// copied from another thread keeps that thread's, as in its own log.
+    var codexTotalsSession = ""
+    /// Copilot shutdown counters are cumulative for the life of a session.
+    var copilotTotals: [String: AgentTokens] = [:]
+    /// Counted requests by model; the empty key holds unresolved attribution.
+    var copilotRequests: [String: Int] = [:]
+    var copilotRequestModels: [String: String] = [:]
+    var copilotReportedRequests: [String: Int] = [:]
+    var copilotTurnID: String?
+    var copilotFinalResponse = false
     /// The parent session when a database row belongs to a subagent.
     var parentSession = ""
     /// OpenCode stores all sessions in one database, tracking per-session state.
     var openCodeSessions: [String: OpenCodeSessionState] = [:]
+    /// Claude's shell commands still waiting for their result, by tool call.
+    /// They run on the Mac, so the turn goes on without the network.
+    var runningCommands: Set<String> = []
 }
 
 /// Per-session turn and model tracking for OpenCode databases.
@@ -92,215 +122,38 @@ enum AgentLogParser {
         }
     }
 
-    private static let codexEvents: Set<String> = [
+    static let codexEvents: Set<String> = [
         "token_count", "task_started", "task_complete", "turn_aborted", "thread_settings_applied",
     ]
 
-    private static func object(_ line: Data) -> [String: Any]? {
+    static func object(_ line: Data) -> [String: Any]? {
         (try? JSONSerialization.jsonObject(with: line)) as? [String: Any]
     }
 
     // MARK: Claude Code
 
     static func parseClaude(_ line: Data, state: inout AgentLogState, now: Date) -> [AgentLogEntry] {
-        if contains(line, #""type":"assistant""#) { return claudeAssistant(line, state: &state, now: now) }
-        guard contains(line, #""type":"user""#) else { return [] }
-        // A local command prints its output without asking the model anything,
-        // so the command line that opened a turn closes it again. Only the
-        // person's own text counts: a tool result can quote the same words.
-        if contains(line, "[Request interrupted by user") || contains(line, "<local-command-std"),
-           let json = object(line), json["type"] as? String == "user", endsTurn(json) {
-            let open = state.turnOpen
-            state.turnOpen = false
-            return open ? [.turnEnded(nil, completed: false, duration: nil)] : []
-        }
-        // Tool results arrive inside a turn and can be large; while a turn is
-        // open, the line only has to say that work goes on.
-        if state.turnOpen { return [.turnActive(nil)] }
-        // A subagent's prompts and tool output never open a turn, and its
-        // tool output can be large: no need to decode it to know that.
-        if contains(line, #""isSidechain":true"#) { return [] }
-        guard let json = object(line), json["type"] as? String == "user",
-              json["isMeta"] as? Bool != true, json["isSidechain"] as? Bool != true else { return [] }
-        adopt(json, into: &state)
-        state.turnOpen = true
-        return [.turnBegan(timestamp(json["timestamp"]) ?? now)]
-    }
-
-    private static func claudeAssistant(_ line: Data, state: inout AgentLogState, now: Date) -> [AgentLogEntry] {
-        guard let json = object(line), json["type"] as? String == "assistant",
-              let message = json["message"] as? [String: Any] else { return [] }
-        adopt(json, into: &state)
-        let date = timestamp(json["timestamp"]) ?? now
-        var entries: [AgentLogEntry] = []
-        let model = native(message["model"] as? String ?? "")
-        if let usage = message["usage"] as? [String: Any], !model.isEmpty, !model.hasPrefix("<") {
-            state.model = model
-            var billable = AgentBillable()
-            billable.tokens = AgentTokens(
-                input: int(usage["input_tokens"]),
-                cacheWrite: int(usage["cache_creation_input_tokens"]),
-                cacheRead: int(usage["cache_read_input_tokens"]),
-                output: int(usage["output_tokens"]),
-                reasoning: int((usage["output_tokens_details"] as? [String: Any])?["thinking_tokens"]))
-            billable.longCacheWrite = int((usage["cache_creation"] as? [String: Any])?["ephemeral_1h_input_tokens"])
-            billable.fast = usage["speed"] as? String == "fast"
-            billable.domestic = usage["inference_geo"] as? String == "us"
-            billable.webSearches = int((usage["server_tool_use"] as? [String: Any])?["web_search_requests"])
-            let id = message["id"] as? String ?? ""
-            let request = json["requestId"] as? String ?? ""
-            let key = id.isEmpty && request.isEmpty
-                ? "claude:\(state.session):\(date.timeIntervalSince1970)" : "claude:\(id):\(request)"
-            let priced = AgentPricing.cost(billable, model: model)
-            entries.append(.usage(key: key, record: AgentUsageRecord(
-                provider: .claude, date: date, model: model, project: state.project, session: state.session,
-                tokens: billable.tokens, cost: priced.cost, savings: priced.savings), billable: billable))
-        }
-        // A subagent's own ending is not the end of the turn it serves.
-        guard json["isSidechain"] as? Bool != true else { return entries }
-        switch message["stop_reason"] as? String {
-        case "end_turn", "stop_sequence", "max_tokens", "refusal":
-            // An error written in place of a reply, like a spent limit, stops
-            // the turn without finishing it.
-            let failed = json["isApiErrorMessage"] as? Bool == true || model.hasPrefix("<")
-            if state.turnOpen { entries.append(.turnEnded(date, completed: !failed, duration: nil)) }
-            state.turnOpen = false
-        default:
-            if !state.turnOpen { entries.append(.turnBegan(date)) }
-            else { entries.append(.turnActive(date)) }
-            state.turnOpen = true
-        }
-        return entries
-    }
-
-    /// The interruption or local command output the person's message holds,
-    /// never text inside a tool result.
-    private static func endsTurn(_ json: [String: Any]) -> Bool {
-        let content = (json["message"] as? [String: Any])?["content"]
-        let texts: [String]
-        if let text = content as? String {
-            texts = [text]
-        } else if let blocks = content as? [[String: Any]] {
-            texts = blocks.compactMap { $0["type"] as? String == "text" ? $0["text"] as? String : nil }
-        } else {
-            texts = []
-        }
-        return texts.contains {
-            $0.hasPrefix("[Request interrupted by user") || $0.hasPrefix("<local-command-std")
-        }
-    }
-
-    private static func adopt(_ json: [String: Any], into state: inout AgentLogState) {
-        if let session = json["sessionId"] as? String, !session.isEmpty { state.session = native(session) }
-        if let cwd = json["cwd"] as? String, !cwd.isEmpty { state.project = projectName(cwd) }
+        ClaudeReader().parse(line, state: &state, now: now)
     }
 
     // MARK: Codex
 
     static func parseCodex(_ line: Data, state: inout AgentLogState, now: Date) -> [AgentLogEntry] {
-        guard let kind = firstType(line) else { return [] }
-        switch kind.name {
-        case "token_usage_record", "turn_context", "session_meta": break
-        case "event_msg":
-            guard let event = firstType(line, from: kind.end), codexEvents.contains(event.name) else { return [] }
-        default: return []
-        }
-        guard let json = object(line), let payload = json["payload"] as? [String: Any] else { return [] }
-        let date = timestamp(json["timestamp"]) ?? now
-        switch json["type"] as? String {
-        case "session_meta":
-            if let id = payload["id"] as? String, !id.isEmpty { state.session = native(id) }
-            if let cwd = payload["cwd"] as? String, !cwd.isEmpty { state.project = projectName(cwd) }
-            return []
-        case "turn_context":
-            if let model = payload["model"] as? String, !model.isEmpty { state.model = native(model) }
-            if let cwd = payload["cwd"] as? String, !cwd.isEmpty { state.project = projectName(cwd) }
-            if let tier = payload["service_tier"] as? String { state.fast = fastTier(tier) }
-            return []
-        case "token_usage_record":
-            guard let usage = payload["usage"] as? [String: Any] else { return [] }
-            state.sawUsageRecords = true
-            if let session = payload["session_id"] as? String, !session.isEmpty, state.session.isEmpty {
-                state.session = native(session)
-            }
-            let response = payload["response_id"] as? String ?? ""
-            let key = response.isEmpty ? "codex:\(state.session):\(date.timeIntervalSince1970)" : "codex:\(response)"
-            return [codexUsage(codexTokens(usage), key: key, date: date, state: state)]
-        case "event_msg":
-            return codexEvent(payload, date: date, state: &state)
-        default:
-            return []
-        }
+        CodexReader().parse(line, state: &state, now: now)
     }
 
-    private static func codexEvent(_ payload: [String: Any], date: Date, state: inout AgentLogState) -> [AgentLogEntry] {
-        switch payload["type"] as? String {
-        case "token_count":
-            var entries: [AgentLogEntry] = []
-            if let limits = payload["rate_limits"] as? [String: Any] {
-                if isMainBucket(limits), let windows = codexWindows(limits, observed: date), !windows.isEmpty {
-                    entries.append(.limits(AgentLimits(provider: .codex, windows: windows,
-                                                       observedAt: date, source: .sessionLog)))
-                }
-                if let plan = limits["plan_type"] as? String, !plan.isEmpty {
-                    entries.append(.plan(plan, observedAt: date))
-                }
-            }
-            // Running totals repeat when only the limits changed; a response
-            // is whatever the total grew by since the previous reading.
-            if !state.sawUsageRecords, let info = payload["info"] as? [String: Any],
-               let totalUsage = info["total_token_usage"] as? [String: Any] {
-                let total = codexTokens(totalUsage)
-                if total != state.lastTotal, total.total > (state.lastTotal?.total ?? 0) {
-                    let delta: AgentTokens
-                    if let last = info["last_token_usage"] as? [String: Any] {
-                        delta = codexTokens(last)
-                    } else {
-                        let previous = state.lastTotal ?? AgentTokens()
-                        delta = AgentTokens(input: max(0, total.input - previous.input),
-                                            cacheWrite: max(0, total.cacheWrite - previous.cacheWrite),
-                                            cacheRead: max(0, total.cacheRead - previous.cacheRead),
-                                            output: max(0, total.output - previous.output),
-                                            reasoning: max(0, total.reasoning - previous.reasoning))
-                    }
-                    let key = "codex:\(state.session):total:\(total.total)"
-                    entries.append(codexUsage(delta, key: key, date: date, state: state))
-                }
-                state.lastTotal = total
-            }
-            return entries
-        case "thread_settings_applied":
-            if let tier = (payload["thread_settings"] as? [String: Any])?["service_tier"] as? String {
-                state.fast = fastTier(tier)
-            }
-            return []
-        case "task_started":
-            state.turnOpen = true
-            return [.turnBegan(seconds(payload["started_at"]) ?? date)]
-        case "task_complete", "turn_aborted":
-            let open = state.turnOpen
-            state.turnOpen = false
-            guard open else { return [] }
-            let duration = (payload["duration_ms"] as? NSNumber).map { $0.doubleValue / 1000 }
-            return [.turnEnded(seconds(payload["completed_at"]) ?? date,
-                               completed: payload["type"] as? String == "task_complete", duration: duration)]
-        default:
-            return []
-        }
+    /// Input counts include what came from the cache.
+    static func codexTokens(_ usage: [String: Any]) -> AgentTokens {
+        let input = int(usage["input_tokens"])
+        let cached = min(input, int(usage["cached_input_tokens"]))
+        let written = min(input - cached, int(usage["cache_write_input_tokens"]))
+        return AgentTokens(input: input - cached - written, cacheWrite: written, cacheRead: cached,
+                           output: int(usage["output_tokens"]), reasoning: int(usage["reasoning_output_tokens"]))
     }
 
     /// Fast mode, named priority before July 2026.
     static func fastTier(_ tier: String) -> Bool {
         ["fast", "priority"].contains(tier.lowercased())
-    }
-
-    private static func codexUsage(_ tokens: AgentTokens, key: String, date: Date, state: AgentLogState) -> AgentLogEntry {
-        var billable = AgentBillable(tokens: tokens)
-        billable.fast = state.fast
-        let priced = AgentPricing.cost(billable, model: state.model)
-        return .usage(key: key, record: AgentUsageRecord(
-            provider: .codex, date: date, model: state.model, project: state.project, session: state.session,
-            tokens: tokens, cost: priced.cost, savings: priced.savings), billable: billable)
     }
 
     // MARK: OpenCode
@@ -311,246 +164,21 @@ enum AgentLogParser {
     static let openCodeSettle: TimeInterval = 30
 
     static func parseOpenCode(_ line: Data, state: inout AgentLogState, now: Date) -> [AgentLogEntry] {
-        guard contains(line, #""role":""#) || contains(line, #""type":"reset""#) else { return [] }
-        guard let json = object(line) else { return [] }
-        if json["type"] as? String == "reset" {
-            state.openCodeSessions.removeAll()
-            state.turnOpen = false
-            return [.reset(now)]
-        }
-        guard let role = json["role"] as? String else { return [] }
-        let id = json["id"] as? String ?? ""
-        let session = json["session_id"] as? String ?? ""
-        let sessionID = session.isEmpty ? state.session : native(session)
-        state.session = sessionID
-        state.parentSession = json["parent_session_id"] as? String ?? ""
-
-        var sessionState = state.openCodeSessions[sessionID] ?? OpenCodeSessionState()
-
-        let cwd = (json["path"] as? [String: Any])?["cwd"] as? String ?? json["directory"] as? String ?? ""
-        if !cwd.isEmpty {
-            sessionState.project = projectName(cwd)
-        }
-
-        let timeCreated = (json["time"] as? [String: Any])?["created"] ?? json["time_created"]
-        let date = seconds(timeCreated) ?? now
-        // A session quiet this long with no reply being written starts its
-        // next prompt as a task of its own, so what it kept to tell its rows
-        // apart can go. Sessions are looked over only as a new one appears.
-        if state.openCodeSessions[sessionID] == nil {
-            state.openCodeSessions = state.openCodeSessions.filter { _, kept in
-                !kept.writingReplyID.isEmpty
-                    || date.timeIntervalSince(kept.lastActivity ?? date) < NotchAgentSupport.idleTurn
-            }
-        }
-        let lastActivity = sessionState.lastActivity
-        sessionState.lastActivity = max(lastActivity ?? date, date)
-
-        switch role {
-        case "user":
-            if !id.isEmpty {
-                // A prompt read again, as when its summary is saved, is no new one.
-                if sessionState.seenUserMessageIDs.contains(id) { return [] }
-                remember(id, in: &sessionState.seenUserMessageIDs)
-                sessionState.activeUserMessageID = id
-            }
-            // OpenCode writes prompts of its own in the middle of a task: the
-            // request that starts a compaction, the follow up after one, the
-            // summary after a command's subtask. A prompt sent while it works
-            // joins the running loop too, so inside a turn each is activity.
-            var entries: [AgentLogEntry] = []
-            // A prompt that arrives after the session went quiet is a task of
-            // its own: the one before stopped without a word, as when a tool
-            // call was rejected, and nothing finished. While a reply is still
-            // being written, as through a long command, the prompt joins it.
-            let quiet: Bool
-            if let settled = sessionState.settledAt {
-                quiet = date.timeIntervalSince(settled) >= openCodeSettle
-            } else if sessionState.writingReplyID.isEmpty, let lastActivity {
-                quiet = date.timeIntervalSince(lastActivity) >= NotchAgentSupport.idleTurn
-            } else {
-                quiet = false
-            }
-            sessionState.settledAt = nil
-            sessionState.activePromptDate = date
-            if sessionState.turnOpen && !quiet {
-                entries.append(.turnActive(date))
-            } else {
-                if sessionState.turnOpen {
-                    entries.append(.turnEnded(lastActivity, completed: false, duration: nil))
-                }
-                sessionState.turnOpen = true
-                sessionState.turnStarted = date
-                entries.append(.turnBegan(date))
-            }
-            let userModel = json["model_id"] as? String
-                ?? json["modelID"] as? String
-                ?? (json["model"] as? [String: Any])?["modelID"] as? String
-                ?? (json["model"] as? [String: Any])?["id"] as? String
-                ?? json["model"] as? String
-            if let userModel, !userModel.isEmpty {
-                sessionState.model = native(userModel)
-            }
-            state.openCodeSessions[sessionID] = sessionState
-            state.project = sessionState.project
-            state.model = sessionState.model
-            state.turnOpen = true
-            return entries
-
-        case "assistant":
-            let rawModel = json["model_id"] as? String
-                ?? json["modelID"] as? String
-                ?? (json["model"] as? [String: Any])?["modelID"] as? String
-                ?? (json["model"] as? [String: Any])?["id"] as? String
-                ?? json["model"] as? String
-            if let rawModel, !rawModel.isEmpty {
-                sessionState.model = native(rawModel)
-            }
-            let tokensDict = json["tokens"] as? [String: Any] ?? [:]
-            let input = int(tokensDict["input"])
-            let output = int(tokensDict["output"])
-            let reasoning = int(tokensDict["reasoning"])
-            let cacheDict = tokensDict["cache"] as? [String: Any] ?? [:]
-            let cacheRead = int(cacheDict["read"])
-            let cacheWrite = int(cacheDict["write"])
-            let tokens = AgentTokens(input: input, cacheWrite: cacheWrite, cacheRead: cacheRead,
-                                     output: output + reasoning, reasoning: reasoning)
-            let billable = AgentBillable(tokens: tokens)
-            let priced = AgentPricing.cost(billable, model: sessionState.model)
-            let recordedCost = (json["cost"] as? NSNumber)?.doubleValue
-            let reportedCostVal = recordedCost ?? 0
-            // A model the list does not know costs what OpenCode recorded.
-            // Local and free models record zero, which stays an estimate so
-            // a price the list learns later still applies.
-            let cost: Double?
-            let isReported: Bool
-            if let calculated = priced.cost {
-                cost = calculated
-                isReported = false
-            } else if let recordedCost {
-                cost = recordedCost
-                isReported = recordedCost > 0
-            } else {
-                cost = nil
-                isReported = false
-            }
-
-            let parentID = json["parentID"] as? String ?? ""
-            let isAlreadyCompleted = (!id.isEmpty && sessionState.completedAssistantMessageIDs.contains(id))
-                || (!parentID.isEmpty && sessionState.completedUserMessageIDs.contains(parentID))
-            let matchesActivePrompt = parentID.isEmpty || parentID == sessionState.activeUserMessageID
-
-            let timeCompleted = (json["time"] as? [String: Any])?["completed"]
-            let completed = seconds(timeCompleted)
-            let hasError = json["error"].map { !($0 is NSNull) } ?? false
-            let finish = json["finish"] as? String
-            if let completed { sessionState.lastActivity = max(sessionState.lastActivity ?? completed, completed) }
-            // A step that starts after the last one settled is the loop going on.
-            if let settled = sessionState.settledAt, date >= settled { sessionState.settledAt = nil }
-
-            var entries: [AgentLogEntry] = []
-            // OpenCode completes each reply before it answers a prompt sent
-            // meanwhile. A reply to a newer prompt while an older one never
-            // completed means OpenCode stopped in the middle of it, as when
-            // it was killed, and the newer prompt started a task of its own.
-            if !id.isEmpty, !sessionState.writingReplyID.isEmpty, sessionState.writingReplyID != id,
-               sessionState.turnOpen, !parentID.isEmpty, parentID == sessionState.activeUserMessageID,
-               let prompt = sessionState.activePromptDate, let started = sessionState.turnStarted, prompt > started {
-                entries.append(.turnEnded(nil, completed: false, duration: nil))
-                entries.append(.turnBegan(prompt))
-                sessionState.turnStarted = prompt
-            }
-            if completed == nil && finish == nil && !hasError && !id.isEmpty {
-                sessionState.writingReplyID = id
-            } else if sessionState.writingReplyID == id {
-                sessionState.writingReplyID = ""
-            }
-            if !isAlreadyCompleted && matchesActivePrompt && !sessionState.turnOpen {
-                sessionState.turnOpen = true
-                sessionState.turnStarted = date
-                entries.append(.turnBegan(date))
-            }
-            // A reply is saved before its answer arrives, and a shell command
-            // run from the prompt, the reply that hands work to a subtask and
-            // a request that failed or was stopped never hold any usage.
-            if tokens.total > 0 || reportedCostVal > 0 {
-                let key = "opencode:\(sessionID):\(id.isEmpty ? "\(date.timeIntervalSince1970)" : id)"
-                let record = AgentUsageRecord(
-                    provider: .opencode, date: date, model: sessionState.model, project: sessionState.project,
-                    session: sessionID, tokens: tokens, cost: cost, savings: priced.savings,
-                    reportedCost: isReported
-                )
-                entries.append(.usage(key: key, record: record, billable: billable))
-            }
-
-            // OpenCode's loop goes on after tool calls, after a reply that
-            // still holds calls whatever its finish says, and after the
-            // summary of a compaction it started on its own. Any other finish
-            // stops it, as does an error or a reply that completes without a
-            // finish, like a shell command's.
-            let ends: Bool
-            if hasError {
-                ends = true
-            } else if let finish {
-                ends = !["tool-calls", "unknown"].contains(finish)
-                    && json["tool_calls"] as? Bool != true && json["auto_compaction"] as? Bool != true
-            } else {
-                ends = completed != nil
-            }
-
-            if ends {
-                if !isAlreadyCompleted && matchesActivePrompt && sessionState.turnOpen {
-                    let endDate = completed ?? seconds(json["time_updated"]) ?? date
-                    var duration: TimeInterval?
-                    if let turnStarted = sessionState.turnStarted {
-                        if endDate >= turnStarted {
-                            duration = endDate.timeIntervalSince(turnStarted)
-                        }
-                    } else if endDate >= date {
-                        duration = endDate.timeIntervalSince(date)
-                    }
-                    sessionState.turnOpen = false
-                    sessionState.turnStarted = nil
-                    sessionState.activeUserMessageID = ""
-                    sessionState.settledAt = nil
-                    entries.append(.turnEnded(endDate, completed: !hasError, duration: duration))
-                }
-                if !id.isEmpty { remember(id, in: &sessionState.completedAssistantMessageIDs) }
-                if !parentID.isEmpty { remember(parentID, in: &sessionState.completedUserMessageIDs) }
-            } else if !isAlreadyCompleted && matchesActivePrompt {
-                // A step that completed hands over to the next one at once,
-                // unless the loop stopped there.
-                if let completed, sessionState.turnOpen {
-                    sessionState.settledAt = completed
-                    entries.append(.turnSettled(completed))
-                } else {
-                    entries.append(.turnActive(date))
-                }
-            }
-            state.openCodeSessions[sessionID] = sessionState
-            state.project = sessionState.project
-            state.model = sessionState.model
-            state.turnOpen = sessionState.turnOpen
-            return entries
-
-        default:
-            return []
-        }
+        OpenCodeReader().parse(line, state: &state, now: now)
     }
 
-    /// Keeps a bounded number of message ids a session has settled.
-    private static func remember(_ id: String, in ids: inout Set<String>) {
-        if ids.count > 100 { ids.removeFirst() }
-        ids.insert(id)
+    // MARK: GitHub Copilot
+
+    /// Copilot CLI and the GitHub Copilot app share an append-only event log.
+    /// Only session context, turn boundaries and cumulative model counters are
+    /// decoded; prompts, replies, reasoning and tool arguments are ignored.
+    static func parseCopilot(_ line: Data, state: inout AgentLogState, now: Date) -> [AgentLogEntry] {
+        CopilotReader().parse(line, state: &state, now: now)
     }
 
-    /// Input counts include what came from the cache.
-    static func codexTokens(_ usage: [String: Any]) -> AgentTokens {
-        let input = int(usage["input_tokens"])
-        let cached = min(input, int(usage["cached_input_tokens"]))
-        let written = min(input - cached, int(usage["cache_write_input_tokens"]))
-        return AgentTokens(input: input - cached - written, cacheWrite: written, cacheRead: cached,
-                           output: int(usage["output_tokens"]), reasoning: int(usage["reasoning_output_tokens"]))
+    static func copilotEvent(_ type: String) -> Bool {
+        ["user.message", "assistant.turn_start", "assistant.message", "assistant.turn_end",
+         "session.start", "session.context_changed", "session.model_change", "session.shutdown", "abort"].contains(type)
     }
 
     /// Codex logs a reading for each allowance: the main one under "codex",

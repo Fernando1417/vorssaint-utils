@@ -26,9 +26,7 @@ enum WindowActivator {
                          handoffSourcePID: pid_t? = nil,
                          sourceWindowID: CGWindowID? = nil,
                          sourceWindowOwnerPID: pid_t? = nil) {
-        let generation = beginActivation(for: item.pid)
-        cancelPendingMinimizeRestore()
-        SpaceHop.cancelPending()
+        let generation = supersedePendingActivations(for: item.pid)
 
         if item.pid == ProcessInfo.processInfo.processIdentifier {
             activateOwnWindow(item)
@@ -46,7 +44,10 @@ enum WindowActivator {
         )
         let windowOwnerPID = item.windowOwnerPID
 
-        app.unhide()
+        // Unhiding an app that is not hidden still brings every one of its
+        // windows forward (measured on macOS 27.2), so a window selection
+        // raised its siblings before fronting the window (issue #1503).
+        if app.isHidden { app.unhide() }
         let activationPlan = SwitcherSupport.activationPlan(
             targetsSpecificWindow: item.windowID != nil
         )
@@ -451,6 +452,13 @@ enum WindowActivator {
         }
     }
 
+    static func supersedePendingActivations(for pid: pid_t) -> UInt64 {
+        let generation = beginActivation(for: pid)
+        cancelPendingMinimizeRestore()
+        SpaceHop.cancelPending()
+        return generation
+    }
+
     private static func beginActivation(for pid: pid_t) -> UInt64 {
         activationLock.withLock {
             activationGeneration &+= 1
@@ -463,7 +471,7 @@ enum WindowActivator {
         activationLock.withLock { activationGenerationsByPID[pid] ?? 0 }
     }
 
-    private static func isCurrentActivation(_ generation: UInt64) -> Bool {
+    static func isCurrentActivation(_ generation: UInt64) -> Bool {
         activationLock.withLock {
             SwitcherSupport.isCurrentActivationGeneration(
                 generation,
@@ -627,28 +635,6 @@ enum WindowActivator {
         cancelPendingMinimizeRestore()
     }
 
-    fileprivate static func restoreSourceAfterTargetMinimize(_ restore: SwitcherWindowMinimizeRestore) {
-        guard pendingMinimizeRestore === restore else { return }
-        let reportedFrontmostPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
-        let frontmostPID = reportedFrontmostPID == restore.targetWindowOwnerPID
-            ? restore.targetPID
-            : reportedFrontmostPID
-        guard SwitcherSupport.shouldRestoreSourceAfterTargetMinimize(targetPID: restore.targetPID,
-                                                                     sourcePID: restore.sourcePID,
-                                                                     frontmostPID: frontmostPID,
-                                                                     targetIsMinimized: true,
-                                                                     frontmostMatchesTargetBundle: restore.matchesTargetBundle(frontmostPID),
-                                                                     frontmostCanBeSystemPromotion: restore.minimizeIntentObserved),
-              activateSource(pid: restore.sourcePID,
-                             windowID: restore.sourceWindowID,
-                             windowOwnerPID: restore.sourceWindowOwnerPID) else {
-            cancelPendingMinimizeRestore()
-            return
-        }
-
-        cancelPendingMinimizeRestore()
-    }
-
     fileprivate static func restoreSourceAfterTargetMinimizeIntent(_ restore: SwitcherWindowMinimizeRestore,
                                                                    keepPending: Bool = false,
                                                                    allowSystemPromotion: Bool = false) {
@@ -686,7 +672,7 @@ enum WindowActivator {
         guard let sourceApp = NSRunningApplication(processIdentifier: pid),
               !sourceApp.isTerminated else { return false }
 
-        sourceApp.unhide()
+        if sourceApp.isHidden { sourceApp.unhide() }
         if let windowID {
             prepareWindowForActivation(windowID: windowID, pid: windowOwnerPID ?? pid)
         }

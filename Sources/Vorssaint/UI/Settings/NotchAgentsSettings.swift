@@ -11,6 +11,7 @@ struct NotchAgentsSettingsControls: View {
     @AppStorage(DefaultsKey.notchAgentsClaude) private var claude = true
     @AppStorage(DefaultsKey.notchAgentsCodex) private var codex = true
     @AppStorage(DefaultsKey.notchAgentsOpenCode) private var opencode = true
+    @AppStorage(DefaultsKey.notchAgentsCopilot) private var copilot = true
     @AppStorage(DefaultsKey.notchAgentsCardOrder) private var cardOrder = ""
     @AppStorage(DefaultsKey.notchAgentsHiddenCards) private var hiddenCards = ""
     @AppStorage(DefaultsKey.notchAgentsLimitDisplay) private var limitDisplay = NotchAgentLimitDisplay.remaining.rawValue
@@ -47,6 +48,8 @@ struct NotchAgentsSettingsControls: View {
             providerRow(.claude, isOn: $claude)
             providerRow(.codex, isOn: $codex)
             providerRow(.opencode, isOn: $opencode)
+            providerRow(.copilot, isOn: $copilot)
+            if codex { CodexAccountsSettings() }
 
             Divider()
             Text(text.cardsTitle).font(.subheadline.weight(.medium))
@@ -65,7 +68,7 @@ struct NotchAgentsSettingsControls: View {
                 }
             }
             Text(text.cardsHint).font(.caption).foregroundStyle(.secondary)
-            // The one card that makes Codex ask the account, said where it is chosen.
+            // The card that makes Codex ask the default account, said where it is chosen.
             if codex, cardBinding(.resets).wrappedValue {
                 Text(text.resetsHelp).font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -95,7 +98,7 @@ struct NotchAgentsSettingsControls: View {
                 NotchAgentStripSample(readout: NotchAgentReadout(rawValue: readout) ?? .elapsed,
                                       display: NotchAgentLimitDisplay(rawValue: limitDisplay) ?? .remaining,
                                       focus: NotchAgentLimitFocus(rawValue: limitFocus) ?? .mostUsed,
-                                      provider: claude ? .claude : (codex ? .codex : .opencode))
+                                      provider: claude ? .claude : codex ? .codex : opencode ? .opencode : .copilot)
                     .padding(.leading, settingsRowTextInset)
             }
 
@@ -137,6 +140,7 @@ struct NotchAgentsSettingsControls: View {
                 TimelineView(.periodic(from: .now, by: 30)) { context in
                     claudeLimitsStatus(now: context.date)
                 }
+                if usage.claudeAccountChecking { ProgressView().controlSize(.small) }
                 Text(text.claudeLimitsPrivacy).font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -150,7 +154,7 @@ struct NotchAgentsSettingsControls: View {
         .onChange(of: claude) { _, on in if on { findClaudeApp() } }
         // Cards and agents set the page's height, and the live reading the
         // closed island's width, which the island follows.
-        .onChange(of: [cardOrder, hiddenCards, String(claude), String(codex),
+        .onChange(of: [cardOrder, hiddenCards, String(claude), String(codex), String(opencode), String(copilot),
                        String(liveActivity), readout, limitDisplay, limitFocus]) { _, _ in
             NotchService.shared.syncWithPreferences()
         }
@@ -162,22 +166,32 @@ struct NotchAgentsSettingsControls: View {
     }
 
     /// Where Claude's plan limits stand, and the one step that brings them
-    /// here when they are missing or old.
+    /// here when they are missing or old. Without a recent reading from
+    /// Claude Code, why its last check failed shows beneath.
     @ViewBuilder private func claudeLimitsStatus(now: Date) -> some View {
-        let checked = usage.claudeAppChecked ?? claudeAppFileCheck
+        let account = usage.snapshot.limits[.claude].flatMap { $0.source == .account ? $0.observedAt : nil }
+        let checked = account ?? usage.claudeAppChecked ?? claudeAppFileCheck
+        let failure = account.map { now.timeIntervalSince($0) < AgentClaudeAppUsage.freshness } == true ? nil
+            : usage.claudeAccountFailure.map { text.claudeCode($0) }
         HStack(alignment: .top, spacing: 10) {
-            if let checked, now.timeIntervalSince(checked) < AgentClaudeAppUsage.freshness {
+            if let account {
+                Image(systemName: now.timeIntervalSince(account) < AgentClaudeAppUsage.freshness
+                      ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                    .foregroundStyle(now.timeIntervalSince(account) < AgentClaudeAppUsage.freshness ? .green : .orange)
+                explained(failure) { Text("Claude Code · " + text.updated(relative(account, now: now))) }
+                Spacer(minLength: 0)
+            } else if let checked, now.timeIntervalSince(checked) < AgentClaudeAppUsage.freshness {
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                Text(text.claudeLimitsCurrent(relative(checked, now: now)))
+                explained(failure) { Text(text.claudeLimitsCurrent(relative(checked, now: now))) }
                 Spacer(minLength: 0)
             } else if claudeApp == nil, checked == nil {
                 Image(systemName: "info.circle.fill").foregroundStyle(.secondary)
-                Text(text.claudeLimitsNoApp)
+                explained(failure) { Text(text.claudeLimitsNoApp) }
                 Spacer(minLength: 8)
                 Button(text.getClaude) { NSWorkspace.shared.open(AgentClaudeAppUsage.downloadURL) }
             } else {
                 Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange)
-                VStack(alignment: .leading, spacing: 4) {
+                explained(failure) {
                     if let checked { Text(text.claudeLimitsStale(relative(checked, now: now))) }
                     Text(text.claudeLimitsMenuBar)
                 }
@@ -191,6 +205,14 @@ struct NotchAgentsSettingsControls: View {
         }
         .font(.callout)
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// A status's words, and why Claude Code could not check when it failed.
+    private func explained<Content: View>(_ failure: String?, @ViewBuilder _ status: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            status()
+            if let failure { Text(failure).foregroundStyle(.secondary) }
+        }
     }
 
     private func relative(_ date: Date, now: Date) -> String {
@@ -223,7 +245,7 @@ struct NotchAgentsSettingsControls: View {
             Spacer(minLength: 12)
             // One agent stays on; turning the section off stops all.
             Toggle(provider.displayName, isOn: isOn).labelsHidden().toggleStyle(.switch)
-                .disabled(isOn.wrappedValue && [claude, codex, opencode].filter { $0 }.count <= 1)
+                .disabled(isOn.wrappedValue && [claude, codex, opencode, copilot].filter { $0 }.count <= 1)
         }
     }
 
@@ -304,4 +326,3 @@ private struct NotchAgentStripSample: View {
         return NotchAgentSupport.stripReading(snapshot, readout: readout, display: display, focus: focus, now: now)
     }
 }
-

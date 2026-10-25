@@ -60,6 +60,12 @@ enum NotchKiwiDeskTests {
                          space.apps.allSatisfy { !$0.isActive }
                      },
                      "nothing is marked when no app is frontmost")
+        let emptyActive = sample.replacingOccurrences(of: "\"active_space\":\"2\"", with: "\"active_space\":\"10\"")
+        if let moved = try? JSONDecoder().decode(KiwiDeskState.self, from: Data(emptyActive.utf8)) {
+            let shown = KiwiDeskSupport.spaces(from: moved, frontmostBundleID: nil)
+            suite.expect(shown.map(\.id) == ["1", "2", "10", "web"] && shown[2].isActive,
+                         "the focused space keeps its card even when it has no windows")
+        }
         suite.expect(KiwiDeskSupport.spaceOrder("2", "10") && !KiwiDeskSupport.spaceOrder("10", "2")
                         && KiwiDeskSupport.spaceOrder("9", "code") && KiwiDeskSupport.spaceOrder("code", "web"),
                      "spaces sort by number, then by name")
